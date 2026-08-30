@@ -1,7 +1,8 @@
 import type { ReactNode } from "react";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { AppShell } from "@/components/app-shell";
+import { PwaRegister } from "@/components/pwa-register";
 import { getCompletedSubchapterIds, getCurriculum } from "@/lib/curriculum";
 import "./globals.css";
 
@@ -18,6 +19,26 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Audio Data Science",
   description: "Curriculă tehnică audio: module, capitole și reguli esențiale.",
+  applicationName: "Audio Data Science",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Lecții",
+  },
+  icons: {
+    apple: "/icons/apple-touch-icon.png",
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#f9fafb",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
 };
 
 export const dynamic = "force-dynamic";
@@ -45,6 +66,7 @@ export default async function RootLayout({
         >
           {children}
         </AppShell>
+        <PwaRegister />
       </body>
     </html>
   );
