@@ -1,7 +1,10 @@
 import { AddLessonForm } from "@/components/add-lesson-form";
+import { AdminUnlockForm } from "@/components/admin-unlock-form";
+import { isAdminUnlocked } from "@/lib/admin";
 import { getCurriculum } from "@/lib/curriculum";
 
 export default async function AdminPage() {
+  const unlocked = await isAdminUnlocked();
   const { data } = await getCurriculum();
 
   return (
@@ -11,10 +14,12 @@ export default async function AdminPage() {
         Adaugă lecție
       </h1>
       <p className="mt-3 mb-10 text-lg leading-relaxed text-gray-500">
-        Titlu, reguli, Salvează. Vocea se generează automat după insert.
+        {unlocked
+          ? "Titlu, reguli, Salvează. Vocea se generează automat după insert."
+          : "Pagina e protejată. Introdu parola ca să adaugi lecții."}
       </p>
       <div className="rounded-xl border border-gray-100 bg-white p-6 shadow-sm">
-        <AddLessonForm curriculum={data} />
+        {unlocked ? <AddLessonForm curriculum={data} /> : <AdminUnlockForm />}
       </div>
     </article>
   );

@@ -2,7 +2,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.8?target
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-admin-password",
 };
 
 type CreateLessonBody = {
@@ -72,6 +73,11 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const adminPassword = Deno.env.get("ADMIN_PASSWORD");
+    if (adminPassword && req.headers.get("x-admin-password") !== adminPassword) {
+      return jsonResponse({ error: "Neautorizat." }, 401);
+    }
+
     const body = (await req.json()) as CreateLessonBody;
     const title = body.title?.trim() ?? "";
     const rules = asRuleList(body.content_rules);

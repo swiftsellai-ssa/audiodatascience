@@ -3,7 +3,7 @@
 import { useMemo, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
+import { saveLesson } from "@/app/admin/actions";
 import type { ModuleWithChildren } from "@/lib/types";
 
 const NEW_VALUE = "__new__";
@@ -53,34 +53,23 @@ export function AddLessonForm({ curriculum }: AddLessonFormProps) {
     setMessage(null);
 
     try {
-      const supabase = createClient();
-      const { data, error } = await supabase.functions.invoke("create-lesson", {
-        body: {
-          moduleId: moduleId === NEW_VALUE ? null : moduleId,
-          moduleTitle: moduleId === NEW_VALUE ? moduleTitle : null,
-          chapterId: chapterId === NEW_VALUE ? null : chapterId,
-          chapterTitle: chapterId === NEW_VALUE ? chapterTitle : null,
-          title,
-          content_rules: rules,
-        },
+      const result = await saveLesson({
+        moduleId: moduleId === NEW_VALUE ? null : moduleId,
+        moduleTitle: moduleId === NEW_VALUE ? moduleTitle : null,
+        chapterId: chapterId === NEW_VALUE ? null : chapterId,
+        chapterTitle: chapterId === NEW_VALUE ? chapterTitle : null,
+        title,
+        content_rules: rules,
       });
 
-      if (data?.error) {
-        throw new Error(data.error);
-      }
-
-      if (error) {
-        throw error;
-      }
-
-      if (!data?.id) {
-        throw new Error("Lecția a fost salvată, dar nu am primit ID-ul.");
+      if (result.error || !result.id) {
+        throw new Error(result.error ?? "Lecția a fost salvată, dar nu am primit ID-ul.");
       }
 
       setStatus("ok");
       setMessage("Lecția e salvată. Audio-ul se generează acum — poți deschide lecția imediat.");
       router.refresh();
-      router.push(`/lesson/${data.id}`);
+      router.push(`/lesson/${result.id}`);
     } catch (error) {
       setStatus("error");
       setMessage(error instanceof Error ? error.message : "Nu am putut salva lecția.");
