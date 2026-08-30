@@ -98,7 +98,7 @@ Deno.serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    const scriptText = `Lecția de astăzi: ${record.title}. ${rulesToText(record.content_rules)}`.trim();
+    const scriptText = `Capitolul: ${record.title}. ${rulesToText(record.content_rules)}`.trim();
 
     const elevenResponse = await fetch(
       `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`,
