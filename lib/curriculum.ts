@@ -27,6 +27,7 @@ type NestedModule = {
       id: string;
       title: string;
       sequence_order: number;
+      audio_url: string | null;
     }[] | null;
   }[] | null;
 };
@@ -57,7 +58,8 @@ export async function getCurriculum(): Promise<CurriculumResult> {
           subchapters (
             id,
             title,
-            sequence_order
+            sequence_order,
+            audio_url
           )
         )
       `,

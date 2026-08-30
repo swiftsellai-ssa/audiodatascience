@@ -10,6 +10,8 @@ import {
   type ReactNode,
   type RefObject,
 } from "react";
+import { flattenPlayableLessons } from "@/lib/queue";
+import type { ModuleWithChildren } from "@/lib/types";
 
 export type PlayingLesson = {
   id: string;
@@ -21,6 +23,7 @@ type PlayerContextValue = {
   playingLesson: PlayingLesson | null;
   playingSubchapterId: string | null;
   playLesson: (lesson: PlayingLesson) => void;
+  playNext: () => PlayingLesson | null;
   completedIds: string[];
   markCompleted: (id: string) => void;
   audioRef: RefObject<HTMLAudioElement | null>;
@@ -29,16 +32,23 @@ type PlayerContextValue = {
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
 type PlayerProviderProps = {
+  curriculum: ModuleWithChildren[];
   initialCompletedIds: string[];
   children: ReactNode;
 };
 
-export function PlayerProvider({ initialCompletedIds, children }: PlayerProviderProps) {
+export function PlayerProvider({
+  curriculum,
+  initialCompletedIds,
+  children,
+}: PlayerProviderProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playingIdRef = useRef<string | null>(null);
   const [playingLesson, setPlayingLesson] = useState<PlayingLesson | null>(null);
   const [completedIds, setCompletedIds] = useState<string[]>(initialCompletedIds);
 
   const playLesson = useCallback((lesson: PlayingLesson) => {
+    playingIdRef.current = lesson.id;
     setPlayingLesson(lesson);
     const audio = audioRef.current;
     if (!audio || !lesson.audio_url) {
@@ -61,6 +71,18 @@ export function PlayerProvider({ initialCompletedIds, children }: PlayerProvider
     });
   }, []);
 
+  const playNext = useCallback((): PlayingLesson | null => {
+    const queue = flattenPlayableLessons(curriculum);
+    const index = queue.findIndex((lesson) => lesson.id === playingIdRef.current);
+    const next = index >= 0 ? queue[index + 1] : null;
+    if (!next) {
+      return null;
+    }
+
+    playLesson(next);
+    return next;
+  }, [curriculum, playLesson]);
+
   const markCompleted = useCallback((id: string) => {
     setCompletedIds((current) => (current.includes(id) ? current : [...current, id]));
   }, []);
@@ -70,11 +92,12 @@ export function PlayerProvider({ initialCompletedIds, children }: PlayerProvider
       playingLesson,
       playingSubchapterId: playingLesson?.id ?? null,
       playLesson,
+      playNext,
       completedIds,
       markCompleted,
       audioRef,
     }),
-    [playingLesson, playLesson, completedIds, markCompleted],
+    [playingLesson, playLesson, playNext, completedIds, markCompleted],
   );
 
   return (

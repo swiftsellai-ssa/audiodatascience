@@ -18,7 +18,7 @@ export function AppShell({ curriculum, completedIds, error, children }: AppShell
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <PlayerProvider initialCompletedIds={completedIds}>
+    <PlayerProvider curriculum={curriculum} initialCompletedIds={completedIds}>
       <div className="flex h-dvh flex-col bg-gray-50 text-gray-900">
         <header className="flex items-center gap-3 border-b border-gray-100 bg-white px-4 py-3 lg:hidden">
           <button

@@ -16,6 +16,7 @@ export type SubchapterSummary = {
   id: string;
   title: string;
   sequence_order: number;
+  audio_url: string | null;
 };
 
 export type ChapterWithSubchapters = Chapter & {

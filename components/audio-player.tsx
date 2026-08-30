@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ChangeEvent } from "react";
+import { useRouter } from "next/navigation";
 import { Pause, Play, Volume2 } from "lucide-react";
 import { useAudioProgress } from "@/hooks/use-audio-progress";
 import { usePlayer } from "@/components/player-provider";
@@ -16,7 +17,8 @@ function formatTime(seconds: number) {
 }
 
 export function AudioPlayer() {
-  const { playingLesson, playLesson, audioRef } = usePlayer();
+  const router = useRouter();
+  const { playingLesson, playLesson, playNext, audioRef } = usePlayer();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -61,11 +63,17 @@ export function AudioPlayer() {
     }
 
     function handleEnded() {
+      onEnded();
+      const next = playNext();
+      if (next) {
+        router.push(`/lesson/${next.id}`);
+        return;
+      }
+
       setIsPlaying(false);
       if (Number.isFinite(el.duration)) {
         setCurrentTime(el.duration);
       }
-      onEnded();
     }
 
     function handlePlay() {
@@ -97,7 +105,7 @@ export function AudioPlayer() {
       el.removeEventListener("pause", handlePause);
       el.removeEventListener("error", handleError);
     };
-  }, [audioRef, onEnded, onLoadedMetadata, onTimeUpdate, playingLesson?.id]);
+  }, [audioRef, onEnded, onLoadedMetadata, onTimeUpdate, playNext, playingLesson?.id, router]);
 
   function togglePlay() {
     const audio = audioRef.current;
