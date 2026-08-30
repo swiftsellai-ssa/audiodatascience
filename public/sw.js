@@ -1,12 +1,21 @@
-const CACHE_NAME = "ads-v1";
-const AUDIO_CACHE = "ads-audio-v1";
+const CACHE_NAME = "ads-static-v2";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener("activate", (event) => {
-  event.waitUntil(self.clients.claim());
+  event.waitUntil(
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys
+          .filter((key) => key !== CACHE_NAME)
+          .map((key) => caches.delete(key)),
+      );
+      await self.clients.claim();
+    })(),
+  );
 });
 
 self.addEventListener("fetch", (event) => {
@@ -15,10 +24,16 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  const url = new URL(request.url);
+  if (request.destination === "audio" || request.destination === "video") {
+    return;
+  }
 
-  if (url.pathname.includes("/storage/v1/object/public/lessons_audio/")) {
-    event.respondWith(cacheFirst(request, AUDIO_CACHE));
+  if (request.headers.has("range")) {
+    return;
+  }
+
+  const url = new URL(request.url);
+  if (url.pathname.includes("/lessons_audio/") || url.hostname.includes("supabase.co")) {
     return;
   }
 

@@ -5,8 +5,10 @@ import {
   useCallback,
   useContext,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
+  type RefObject,
 } from "react";
 
 export type PlayingLesson = {
@@ -21,6 +23,7 @@ type PlayerContextValue = {
   playLesson: (lesson: PlayingLesson) => void;
   completedIds: string[];
   markCompleted: (id: string) => void;
+  audioRef: RefObject<HTMLAudioElement | null>;
 };
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -31,11 +34,31 @@ type PlayerProviderProps = {
 };
 
 export function PlayerProvider({ initialCompletedIds, children }: PlayerProviderProps) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [playingLesson, setPlayingLesson] = useState<PlayingLesson | null>(null);
   const [completedIds, setCompletedIds] = useState<string[]>(initialCompletedIds);
 
   const playLesson = useCallback((lesson: PlayingLesson) => {
-    setPlayingLesson((current) => (current?.id === lesson.id ? current : lesson));
+    setPlayingLesson(lesson);
+    const audio = audioRef.current;
+    if (!audio || !lesson.audio_url) {
+      return;
+    }
+
+    audio.muted = false;
+    audio.defaultMuted = false;
+    if (audio.volume === 0) {
+      audio.volume = 1;
+    }
+
+    if (audio.getAttribute("src") !== lesson.audio_url) {
+      audio.setAttribute("src", lesson.audio_url);
+      audio.load();
+    }
+
+    void audio.play().catch(() => {
+      // Mobile browsers may require a second tap on the player button.
+    });
   }, []);
 
   const markCompleted = useCallback((id: string) => {
@@ -49,11 +72,17 @@ export function PlayerProvider({ initialCompletedIds, children }: PlayerProvider
       playLesson,
       completedIds,
       markCompleted,
+      audioRef,
     }),
     [playingLesson, playLesson, completedIds, markCompleted],
   );
 
-  return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
+  return (
+    <PlayerContext.Provider value={value}>
+      {children}
+      <audio ref={audioRef} playsInline preload="none" />
+    </PlayerContext.Provider>
+  );
 }
 
 export function usePlayer() {
@@ -65,5 +94,3 @@ export function usePlayer() {
 
   return context;
 }
-
-

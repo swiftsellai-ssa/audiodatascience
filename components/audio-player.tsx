@@ -1,10 +1,9 @@
 "use client";
 
-import { useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useState, type ChangeEvent } from "react";
 import { Pause, Play, Volume2 } from "lucide-react";
 import { useAudioProgress } from "@/hooks/use-audio-progress";
-import { usePlayer, type PlayingLesson } from "@/components/player-provider";
-import { prepareAudioElement, unlockAudio } from "@/lib/audio-output";
+import { usePlayer } from "@/components/player-provider";
 
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds) || seconds < 0) {
@@ -17,20 +16,7 @@ function formatTime(seconds: number) {
 }
 
 export function AudioPlayer() {
-  const { playingLesson } = usePlayer();
-
-  return (
-    <>
-      <div className="h-[88px] shrink-0" aria-hidden />
-      <div className="fixed bottom-0 left-0 z-40 w-full border-t border-gray-100 bg-white">
-        <PlayerBar key={playingLesson?.id ?? "idle"} lesson={playingLesson} />
-      </div>
-    </>
-  );
-}
-
-function PlayerBar({ lesson }: { lesson: PlayingLesson | null }) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const { playingLesson, playLesson, audioRef } = usePlayer();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -39,73 +25,92 @@ function PlayerBar({ lesson }: { lesson: PlayingLesson | null }) {
 
   const { onLoadedMetadata, onTimeUpdate, onEnded } = useAudioProgress({
     audioRef,
-    subchapterId: lesson?.id ?? null,
+    subchapterId: playingLesson?.id ?? null,
   });
 
-  const audioUrl = lesson?.audio_url ?? null;
+  const audioUrl = playingLesson?.audio_url ?? null;
 
-  async function startPlayback() {
+  useEffect(() => {
+    setLoadError(false);
+    setCurrentTime(0);
+    setDuration(0);
+    setIsPlaying(false);
+  }, [playingLesson?.id]);
+
+  useEffect(() => {
     const audio = audioRef.current;
-    if (!audio || !audioUrl) {
+    if (!audio) {
       return;
     }
 
-    await unlockAudio();
-    prepareAudioElement(audio, volume);
+    const el = audio;
 
-    try {
-      await audio.play();
+    function handleLoadedMetadata() {
+      if (Number.isFinite(el.duration)) {
+        setDuration(el.duration);
+      }
+      onLoadedMetadata();
+    }
+
+    function handleTimeUpdate() {
+      setCurrentTime(el.currentTime);
+      if (Number.isFinite(el.duration)) {
+        setDuration(el.duration);
+      }
+      onTimeUpdate();
+    }
+
+    function handleEnded() {
+      setIsPlaying(false);
+      if (Number.isFinite(el.duration)) {
+        setCurrentTime(el.duration);
+      }
+      onEnded();
+    }
+
+    function handlePlay() {
       setIsPlaying(true);
-    } catch {
+      setLoadError(false);
+    }
+
+    function handlePause() {
       setIsPlaying(false);
     }
-  }
 
-  function handleLoadedMetadata() {
-    const audio = audioRef.current;
-    if (audio && Number.isFinite(audio.duration)) {
-      setDuration(audio.duration);
+    function handleError() {
+      setLoadError(true);
+      setIsPlaying(false);
     }
-    if (audio) {
-      prepareAudioElement(audio, volume);
-    }
-    onLoadedMetadata();
-    void startPlayback();
-  }
 
-  function handleTimeUpdate() {
-    const audio = audioRef.current;
-    if (audio) {
-      setCurrentTime(audio.currentTime);
-      if (Number.isFinite(audio.duration)) {
-        setDuration(audio.duration);
-      }
-    }
-    onTimeUpdate();
-  }
+    el.addEventListener("loadedmetadata", handleLoadedMetadata);
+    el.addEventListener("timeupdate", handleTimeUpdate);
+    el.addEventListener("ended", handleEnded);
+    el.addEventListener("play", handlePlay);
+    el.addEventListener("pause", handlePause);
+    el.addEventListener("error", handleError);
 
-  function handleEnded() {
-    setIsPlaying(false);
-    const audio = audioRef.current;
-    if (audio && Number.isFinite(audio.duration)) {
-      setCurrentTime(audio.duration);
-    }
-    onEnded();
-  }
+    return () => {
+      el.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      el.removeEventListener("timeupdate", handleTimeUpdate);
+      el.removeEventListener("ended", handleEnded);
+      el.removeEventListener("play", handlePlay);
+      el.removeEventListener("pause", handlePause);
+      el.removeEventListener("error", handleError);
+    };
+  }, [audioRef, onEnded, onLoadedMetadata, onTimeUpdate, playingLesson?.id]);
 
   function togglePlay() {
     const audio = audioRef.current;
-    if (!audio || !audioUrl) {
+    if (!audio || !playingLesson || !audioUrl) {
       return;
     }
 
-    if (isPlaying) {
+    if (!audio.paused) {
       audio.pause();
-      setIsPlaying(false);
       return;
     }
 
-    void startPlayback();
+    playLesson(playingLesson);
   }
 
   function handleSeek(event: ChangeEvent<HTMLInputElement>) {
@@ -129,9 +134,9 @@ function PlayerBar({ lesson }: { lesson: PlayingLesson | null }) {
     }
   }
 
-  const title = lesson?.title ?? "Nicio lecție în redare";
+  const title = playingLesson?.title ?? "Nicio lecție în redare";
   const canPlay = Boolean(audioUrl);
-  const statusMessage = lesson
+  const statusMessage = playingLesson
     ? audioUrl
       ? null
       : "Această lecție nu are încă audio."
@@ -139,80 +144,67 @@ function PlayerBar({ lesson }: { lesson: PlayingLesson | null }) {
 
   return (
     <>
-      <div className="mx-auto flex h-[88px] max-w-5xl items-center gap-4 px-4 sm:px-6">
-        <button
-          type="button"
-          onClick={togglePlay}
-          disabled={!canPlay}
-          aria-label={isPlaying ? "Pauză" : "Redă"}
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-900 text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
-        >
-          {isPlaying ? (
-            <Pause className="h-5 w-5" fill="currentColor" />
-          ) : (
-            <Play className="ml-0.5 h-5 w-5" fill="currentColor" />
-          )}
-        </button>
+      <div className="h-[88px] shrink-0" aria-hidden />
+      <div className="fixed bottom-0 left-0 z-40 w-full border-t border-gray-100 bg-white">
+        <div className="mx-auto flex h-[88px] max-w-5xl items-center gap-4 px-4 sm:px-6">
+          <button
+            type="button"
+            onClick={togglePlay}
+            disabled={!canPlay}
+            aria-label={isPlaying ? "Pauză" : "Redă"}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gray-900 text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:bg-gray-200 disabled:text-gray-400"
+          >
+            {isPlaying ? (
+              <Pause className="h-5 w-5" fill="currentColor" />
+            ) : (
+              <Play className="ml-0.5 h-5 w-5" fill="currentColor" />
+            )}
+          </button>
 
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-gray-900">{title}</p>
-          {statusMessage ? (
-            <p className="mt-1 text-xs text-gray-400">{statusMessage}</p>
-          ) : loadError ? (
-            <p className="mt-1 text-xs text-gray-400">Audio-ul nu a putut fi redat.</p>
-          ) : (
-            <div className="mt-2 flex items-center gap-3">
-              <span className="w-10 shrink-0 text-xs tabular-nums text-gray-400">
-                {formatTime(currentTime)}
-              </span>
-              <input
-                type="range"
-                min={0}
-                max={duration || 0}
-                step={0.1}
-                value={Math.min(currentTime, duration || 0)}
-                onChange={handleSeek}
-                disabled={!canPlay || duration <= 0}
-                aria-label="Progres"
-                className="h-1 w-full cursor-pointer rounded-full accent-gray-900 disabled:cursor-not-allowed"
-              />
-              <span className="w-10 shrink-0 text-right text-xs tabular-nums text-gray-400">
-                {formatTime(duration)}
-              </span>
-            </div>
-          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-gray-900">{title}</p>
+            {statusMessage ? (
+              <p className="mt-1 text-xs text-gray-400">{statusMessage}</p>
+            ) : loadError ? (
+              <p className="mt-1 text-xs text-gray-400">Audio-ul nu a putut fi redat.</p>
+            ) : (
+              <div className="mt-2 flex items-center gap-3">
+                <span className="w-10 shrink-0 text-xs tabular-nums text-gray-400">
+                  {formatTime(currentTime)}
+                </span>
+                <input
+                  type="range"
+                  min={0}
+                  max={duration || 0}
+                  step={0.1}
+                  value={Math.min(currentTime, duration || 0)}
+                  onChange={handleSeek}
+                  disabled={!canPlay || duration <= 0}
+                  aria-label="Progres"
+                  className="h-1 w-full cursor-pointer rounded-full accent-gray-900 disabled:cursor-not-allowed"
+                />
+                <span className="w-10 shrink-0 text-right text-xs tabular-nums text-gray-400">
+                  {formatTime(duration)}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <label className="hidden items-center gap-2 sm:flex">
+            <Volume2 className="h-4 w-4 text-gray-400" />
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.05}
+              value={volume}
+              onChange={handleVolume}
+              aria-label="Volum"
+              className="h-1 w-20 cursor-pointer accent-gray-900"
+            />
+          </label>
         </div>
-
-        <label className="hidden items-center gap-2 sm:flex">
-          <Volume2 className="h-4 w-4 text-gray-400" />
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.05}
-            value={volume}
-            onChange={handleVolume}
-            aria-label="Volum"
-            className="h-1 w-20 cursor-pointer accent-gray-900"
-          />
-        </label>
       </div>
-
-      {audioUrl && lesson ? (
-        <audio
-          ref={audioRef}
-          src={audioUrl}
-          preload="auto"
-          playsInline
-          crossOrigin="anonymous"
-          onLoadedMetadata={handleLoadedMetadata}
-          onTimeUpdate={handleTimeUpdate}
-          onEnded={handleEnded}
-          onPlay={() => setIsPlaying(true)}
-          onPause={() => setIsPlaying(false)}
-          onError={() => setLoadError(true)}
-        />
-      ) : null}
     </>
   );
 }
