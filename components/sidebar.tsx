@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Check, ChevronRight } from "lucide-react";
+import { usePlayer } from "@/components/player-provider";
 import type { ModuleWithChildren } from "@/lib/types";
 
 type SidebarProps = {
   curriculum: ModuleWithChildren[];
-  completedIds: string[];
   error: string | null;
   onNavigate?: () => void;
 };
@@ -17,10 +17,10 @@ function findAncestors(
   curriculum: ModuleWithChildren[],
   subchapterId: string,
 ): { moduleId: string; chapterId: string } | null {
-  for (const module of curriculum) {
-    for (const chapter of module.chapters) {
+  for (const curriculumModule of curriculum) {
+    for (const chapter of curriculumModule.chapters) {
       if (chapter.subchapters.some((subchapter) => subchapter.id === subchapterId)) {
-        return { moduleId: module.id, chapterId: chapter.id };
+        return { moduleId: curriculumModule.id, chapterId: chapter.id };
       }
     }
   }
@@ -28,10 +28,16 @@ function findAncestors(
   return null;
 }
 
-export function Sidebar({ curriculum, completedIds, error, onNavigate }: SidebarProps) {
+export function Sidebar({ curriculum, error, onNavigate }: SidebarProps) {
+  const { completedIds } = usePlayer();
   const pathname = usePathname();
   const activeId = pathname.startsWith("/lesson/") ? pathname.slice("/lesson/".length) : null;
   const completed = useMemo(() => new Set(completedIds), [completedIds]);
+
+  const ancestors = useMemo(
+    () => (activeId ? findAncestors(curriculum, activeId) : null),
+    [activeId, curriculum],
+  );
 
   const [openModules, setOpenModules] = useState<Set<string>>(() => {
     const first = curriculum[0]?.id;
@@ -42,19 +48,21 @@ export function Sidebar({ curriculum, completedIds, error, onNavigate }: Sidebar
     return firstChapter ? new Set([firstChapter]) : new Set();
   });
 
-  useEffect(() => {
-    if (!activeId) {
-      return;
+  const modulesOpen = useMemo(() => {
+    const next = new Set(openModules);
+    if (ancestors) {
+      next.add(ancestors.moduleId);
     }
+    return next;
+  }, [openModules, ancestors]);
 
-    const ancestors = findAncestors(curriculum, activeId);
-    if (!ancestors) {
-      return;
+  const chaptersOpen = useMemo(() => {
+    const next = new Set(openChapters);
+    if (ancestors) {
+      next.add(ancestors.chapterId);
     }
-
-    setOpenModules((current) => new Set(current).add(ancestors.moduleId));
-    setOpenChapters((current) => new Set(current).add(ancestors.chapterId));
-  }, [activeId, curriculum]);
+    return next;
+  }, [openChapters, ancestors]);
 
   function toggleModule(id: string) {
     setOpenModules((current) => {
@@ -101,15 +109,15 @@ export function Sidebar({ curriculum, completedIds, error, onNavigate }: Sidebar
       ) : null}
 
       <ul className="space-y-6">
-        {curriculum.map((module) => {
-          const moduleOpen = openModules.has(module.id);
+        {curriculum.map((curriculumModule) => {
+          const moduleOpen = modulesOpen.has(curriculumModule.id);
 
           return (
-            <li key={module.id}>
+            <li key={curriculumModule.id}>
               <button
                 type="button"
                 aria-expanded={moduleOpen}
-                onClick={() => toggleModule(module.id)}
+                onClick={() => toggleModule(curriculumModule.id)}
                 className="flex w-full items-center gap-2 px-2 text-left"
               >
                 <ChevronRight
@@ -118,14 +126,14 @@ export function Sidebar({ curriculum, completedIds, error, onNavigate }: Sidebar
                   }`}
                 />
                 <span className="text-sm font-semibold leading-snug text-gray-900">
-                  {module.title}
+                  {curriculumModule.title}
                 </span>
               </button>
 
               {moduleOpen ? (
                 <ul className="mt-2 space-y-1 pl-4">
-                  {module.chapters.map((chapter) => {
-                    const chapterOpen = openChapters.has(chapter.id);
+                  {curriculumModule.chapters.map((chapter) => {
+                    const chapterOpen = chaptersOpen.has(chapter.id);
 
                     return (
                       <li key={chapter.id}>

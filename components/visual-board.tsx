@@ -1,3 +1,4 @@
+import { ListenButton } from "@/components/listen-button";
 import type { Lesson } from "@/lib/types";
 
 type VisualBoardProps = {
@@ -11,9 +12,12 @@ export function VisualBoard({ lesson }: VisualBoardProps) {
         {lesson.moduleTitle}
         {lesson.chapterTitle ? ` · ${lesson.chapterTitle}` : ""}
       </p>
-      <h1 className="mb-10 text-3xl font-semibold tracking-tight text-gray-900">
+      <h1 className="text-3xl font-semibold tracking-tight text-gray-900">
         {lesson.title}
       </h1>
+      <div className="mb-10">
+        <ListenButton lesson={lesson} />
+      </div>
 
       {lesson.content_rules.length === 0 ? (
         <p className="text-lg leading-relaxed text-gray-500">

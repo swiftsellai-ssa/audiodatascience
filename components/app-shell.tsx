@@ -4,7 +4,7 @@ import { useState, type ReactNode } from "react";
 import { Menu, X } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { PlayerProvider } from "@/components/player-provider";
-import { PlayerSlot } from "@/components/player-slot";
+import { AudioPlayer } from "@/components/audio-player";
 import type { ModuleWithChildren } from "@/lib/types";
 
 type AppShellProps = {
@@ -18,7 +18,7 @@ export function AppShell({ curriculum, completedIds, error, children }: AppShell
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <PlayerProvider>
+    <PlayerProvider initialCompletedIds={completedIds}>
       <div className="flex h-dvh flex-col bg-gray-50 text-gray-900">
         <header className="flex items-center gap-3 border-b border-gray-100 bg-white px-4 py-3 lg:hidden">
           <button
@@ -49,7 +49,6 @@ export function AppShell({ curriculum, completedIds, error, children }: AppShell
           >
             <Sidebar
               curriculum={curriculum}
-              completedIds={completedIds}
               error={error}
               onNavigate={() => setMobileOpen(false)}
             />
@@ -58,7 +57,7 @@ export function AppShell({ curriculum, completedIds, error, children }: AppShell
           <main className="min-w-0 flex-1 overflow-y-auto">{children}</main>
         </div>
 
-        <PlayerSlot />
+        <AudioPlayer />
       </div>
     </PlayerProvider>
   );
