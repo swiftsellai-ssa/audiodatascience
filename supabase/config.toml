@@ -3,3 +3,7 @@ project_id = "sovjjnqadhmfapbobqxj"
 [functions.generate-audio]
 enabled = true
 verify_jwt = true
+
+[functions.create-lesson]
+enabled = true
+verify_jwt = true

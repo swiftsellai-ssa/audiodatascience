@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Check, ChevronRight } from "lucide-react";
+import { Check, ChevronRight, Plus } from "lucide-react";
 import { usePlayer } from "@/components/player-provider";
 import type { ModuleWithChildren } from "@/lib/types";
 
@@ -93,9 +93,21 @@ export function Sidebar({ curriculum, error, onNavigate }: SidebarProps) {
       <Link
         href="/"
         onClick={onNavigate}
-        className="mb-8 block px-2 text-sm font-semibold tracking-tight text-gray-900"
+        className="mb-4 block px-2 text-sm font-semibold tracking-tight text-gray-900"
       >
         Audio Data Science
+      </Link>
+      <Link
+        href="/admin"
+        onClick={onNavigate}
+        className={`mb-8 flex items-center gap-2 rounded-lg px-2 py-2 text-sm ${
+          pathname === "/admin"
+            ? "bg-gray-900 text-white"
+            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+        }`}
+      >
+        <Plus className="h-4 w-4" />
+        Adaugă lecție
       </Link>
 
       {error ? (
