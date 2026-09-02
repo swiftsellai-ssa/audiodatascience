@@ -19,14 +19,20 @@ export type PlayingLesson = {
   audio_url: string | null;
 };
 
+export type RepeatMode = "off" | "all" | "one";
+
 type PlayerContextValue = {
   playingLesson: PlayingLesson | null;
   playingSubchapterId: string | null;
-  playLesson: (lesson: PlayingLesson) => void;
+  playLesson: (lesson: PlayingLesson, options?: { fromStart?: boolean }) => void;
   playNext: () => PlayingLesson | null;
+  playFirst: () => PlayingLesson | null;
+  repeatMode: RepeatMode;
+  cycleRepeatMode: () => void;
   completedIds: string[];
   markCompleted: (id: string) => void;
   audioRef: RefObject<HTMLAudioElement | null>;
+  skipResumeRef: RefObject<boolean>;
 };
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
@@ -44,11 +50,14 @@ export function PlayerProvider({
 }: PlayerProviderProps) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const playingIdRef = useRef<string | null>(null);
+  const skipResumeRef = useRef(false);
   const [playingLesson, setPlayingLesson] = useState<PlayingLesson | null>(null);
   const [completedIds, setCompletedIds] = useState<string[]>(initialCompletedIds);
+  const [repeatMode, setRepeatMode] = useState<RepeatMode>("all");
 
-  const playLesson = useCallback((lesson: PlayingLesson) => {
+  const playLesson = useCallback((lesson: PlayingLesson, options?: { fromStart?: boolean }) => {
     playingIdRef.current = lesson.id;
+    skipResumeRef.current = Boolean(options?.fromStart);
     setPlayingLesson(lesson);
     const audio = audioRef.current;
     if (!audio || !lesson.audio_url) {
@@ -61,14 +70,23 @@ export function PlayerProvider({
       audio.volume = 1;
     }
 
+    const start = () => {
+      if (options?.fromStart) {
+        audio.currentTime = 0;
+      }
+      void audio.play().catch(() => {
+        // Mobile browsers may require a second tap on the player button.
+      });
+    };
+
     if (audio.getAttribute("src") !== lesson.audio_url) {
       audio.setAttribute("src", lesson.audio_url);
       audio.load();
+      audio.addEventListener("canplay", start, { once: true });
+      return;
     }
 
-    void audio.play().catch(() => {
-      // Mobile browsers may require a second tap on the player button.
-    });
+    start();
   }, []);
 
   const playNext = useCallback((): PlayingLesson | null => {
@@ -79,9 +97,27 @@ export function PlayerProvider({
       return null;
     }
 
-    playLesson(next);
+    playLesson(next, { fromStart: true });
     return next;
   }, [curriculum, playLesson]);
+
+  const playFirst = useCallback((): PlayingLesson | null => {
+    const first = flattenPlayableLessons(curriculum)[0];
+    if (!first) {
+      return null;
+    }
+
+    playLesson(first, { fromStart: true });
+    return first;
+  }, [curriculum, playLesson]);
+
+  const cycleRepeatMode = useCallback(() => {
+    setRepeatMode((current) => {
+      if (current === "off") return "all";
+      if (current === "all") return "one";
+      return "off";
+    });
+  }, []);
 
   const markCompleted = useCallback((id: string) => {
     setCompletedIds((current) => (current.includes(id) ? current : [...current, id]));
@@ -93,11 +129,24 @@ export function PlayerProvider({
       playingSubchapterId: playingLesson?.id ?? null,
       playLesson,
       playNext,
+      playFirst,
+      repeatMode,
+      cycleRepeatMode,
       completedIds,
       markCompleted,
       audioRef,
+      skipResumeRef,
     }),
-    [playingLesson, playLesson, playNext, completedIds, markCompleted],
+    [
+      playingLesson,
+      playLesson,
+      playNext,
+      playFirst,
+      repeatMode,
+      cycleRepeatMode,
+      completedIds,
+      markCompleted,
+    ],
   );
 
   return (

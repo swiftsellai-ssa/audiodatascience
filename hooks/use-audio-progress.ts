@@ -12,7 +12,7 @@ type UseAudioProgressOptions = {
 };
 
 export function useAudioProgress({ audioRef, subchapterId }: UseAudioProgressOptions) {
-  const { markCompleted } = usePlayer();
+  const { markCompleted, skipResumeRef } = usePlayer();
   const resumeAtRef = useRef(0);
   const lastSavedRef = useRef(0);
   const currentSecondsRef = useRef(0);
@@ -28,10 +28,16 @@ export function useAudioProgress({ audioRef, subchapterId }: UseAudioProgressOpt
       return;
     }
 
+    if (skipResumeRef.current) {
+      skipResumeRef.current = false;
+      audio.currentTime = 0;
+      return;
+    }
+
     const duration = audio.duration;
     const resumeAt = resumeAtRef.current;
     const nearEnd =
-      Number.isFinite(duration) && duration > 0 && resumeAt >= duration - 0.5;
+      Number.isFinite(duration) && duration > 0 && resumeAt >= duration - 1;
 
     audio.currentTime = nearEnd ? 0 : resumeAt;
   }, [audioRef]);

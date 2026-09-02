@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState, type ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useRouter } from "next/navigation";
-import { Pause, Play, Volume2 } from "lucide-react";
+import { Pause, Play, Repeat, Repeat1, Volume2 } from "lucide-react";
 import { useAudioProgress } from "@/hooks/use-audio-progress";
 import { usePlayer } from "@/components/player-provider";
 
@@ -18,12 +18,21 @@ function formatTime(seconds: number) {
 
 export function AudioPlayer() {
   const router = useRouter();
-  const { playingLesson, playLesson, playNext, audioRef } = usePlayer();
+  const {
+    playingLesson,
+    playLesson,
+    playNext,
+    playFirst,
+    repeatMode,
+    cycleRepeatMode,
+    audioRef,
+  } = usePlayer();
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [loadError, setLoadError] = useState(false);
   const [volume, setVolume] = useState(1);
+  const retryRef = useRef(false);
 
   const { onLoadedMetadata, onTimeUpdate, onEnded } = useAudioProgress({
     audioRef,
@@ -37,6 +46,7 @@ export function AudioPlayer() {
     setCurrentTime(0);
     setDuration(0);
     setIsPlaying(false);
+    retryRef.current = false;
   }, [playingLesson?.id]);
 
   useEffect(() => {
@@ -64,7 +74,14 @@ export function AudioPlayer() {
 
     function handleEnded() {
       onEnded();
-      const next = playNext();
+
+      if (repeatMode === "one") {
+        el.currentTime = 0;
+        void el.play().catch(() => setIsPlaying(false));
+        return;
+      }
+
+      const next = playNext() ?? (repeatMode === "all" ? playFirst() : null);
       if (next) {
         router.push(`/lesson/${next.id}`);
         return;
@@ -86,6 +103,16 @@ export function AudioPlayer() {
     }
 
     function handleError() {
+      if (!retryRef.current && el.getAttribute("src")) {
+        retryRef.current = true;
+        el.load();
+        void el.play().catch(() => {
+          setLoadError(true);
+          setIsPlaying(false);
+        });
+        return;
+      }
+
       setLoadError(true);
       setIsPlaying(false);
     }
@@ -105,7 +132,17 @@ export function AudioPlayer() {
       el.removeEventListener("pause", handlePause);
       el.removeEventListener("error", handleError);
     };
-  }, [audioRef, onEnded, onLoadedMetadata, onTimeUpdate, playNext, playingLesson?.id, router]);
+  }, [
+    audioRef,
+    onEnded,
+    onLoadedMetadata,
+    onTimeUpdate,
+    playFirst,
+    playNext,
+    playingLesson?.id,
+    repeatMode,
+    router,
+  ]);
 
   function togglePlay() {
     const audio = audioRef.current;
@@ -197,6 +234,29 @@ export function AudioPlayer() {
               </div>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={cycleRepeatMode}
+            aria-label={
+              repeatMode === "one"
+                ? "Repetă lecția"
+                : repeatMode === "all"
+                  ? "Repetă lista"
+                  : "Fără repetare"
+            }
+            className={`rounded-lg p-2 ${
+              repeatMode === "off"
+                ? "text-gray-300 hover:text-gray-500"
+                : "text-gray-900"
+            }`}
+          >
+            {repeatMode === "one" ? (
+              <Repeat1 className="h-5 w-5" />
+            ) : (
+              <Repeat className="h-5 w-5" />
+            )}
+          </button>
 
           <label className="hidden items-center gap-2 sm:flex">
             <Volume2 className="h-4 w-4 text-gray-400" />
